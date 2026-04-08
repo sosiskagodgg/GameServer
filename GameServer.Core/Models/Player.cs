@@ -8,6 +8,8 @@ namespace GameServer.Core.Models
 {
     public class Player
     {
-
+        public int Id { get; }
+        public int ConnectionId { get; }
+        public Player(int id,int connectionId) {  Id = id;ConnectionId = connectionId; }
     }
 }

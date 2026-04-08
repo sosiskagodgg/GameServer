@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GameServer.Core.Models
+namespace GameServer.Server.PlayerManagement
 {
-    internal class SendingData
+    internal class PlayerManager
     {
     }
 }

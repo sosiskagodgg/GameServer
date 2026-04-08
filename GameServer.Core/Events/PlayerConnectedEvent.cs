@@ -8,5 +8,8 @@ namespace GameServer.Core.Events
 {
     public class PlayerConnectedEvent
     {
+        public int PlayerId { get; }
+        public int ConnectionId { get; }
+        public PlayerConnectedEvent(int playerId,int connectionId) { PlayerId = playerId;ConnectionId = connectionId; }
     }
 }

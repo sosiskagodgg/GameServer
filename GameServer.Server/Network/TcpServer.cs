@@ -8,15 +8,26 @@ using System.Threading.Tasks;
 
 namespace GameServer.Server.Network
 {
-    public class TcpServer
+    public class TcpServer : ITcpServer
     {
+
+
+
         private TcpListener? _listener;
         private bool _isRunning;
         private CancellationTokenSource? _acceptCts;
+        
 
-        public bool IsRunning => _isRunning;
+        private List<ClientConnection> _connections { get; set; } = new();
+        private readonly object _connectionsLock = new();
 
-        public async Task StartAsync(IPEndPoint endPoint, CancellationToken ct = default)
+        private int _nextId = 1;
+        public bool isRunning => _isRunning;
+
+
+        public event EventHandler<(int ClientId, byte[]? Data)>? DataReceived;
+        public event EventHandler<int>? OnConnected;
+        public Task StartAsync(IPEndPoint endPoint, CancellationToken ct = default)
         {
             if (_isRunning)
                 throw new InvalidOperationException("Сервер уже запущен");
@@ -27,9 +38,10 @@ namespace GameServer.Server.Network
             _isRunning = true;
             _acceptCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-            _ = Task.Run(() =>  AcceptClientsLoopAsync(_acceptCts.Token)); 
-        }
+            _ = Task.Run(() =>  AcceptClientsLoopAsync(_acceptCts.Token));
 
+            return Task.CompletedTask;
+        }
         public async Task StopAsync(CancellationToken ct = default)
         {
             if (!_isRunning) return;
@@ -39,6 +51,15 @@ namespace GameServer.Server.Network
             _isRunning = false;
             await Task.CompletedTask;
         }
+
+        public async Task SendToClientAsync(int clientId,byte[] data)
+        {
+            ClientConnection? clientConnection;
+            lock (_connectionsLock) { clientConnection = _connections.FirstOrDefault(c => c.Id == clientId); }
+            if (clientConnection == null) throw new InvalidOperationException("Клиента с таким Id не существует");
+            await clientConnection.SendAsync(data);
+        }
+
         private async Task AcceptClientsLoopAsync(CancellationToken ct)
         {
             try
@@ -47,7 +68,18 @@ namespace GameServer.Server.Network
                 {
                     var client = await _listener.AcceptTcpClientAsync(ct);
 
-                    _ = Task.Run(() => HadleClientAsync(client, ct));
+                    ClientConnection clientConnection = new ClientConnection(_nextId, client);
+                    lock (_connectionsLock)
+                    {
+                        _connections.Add(clientConnection);
+                        _nextId++;
+                    }
+                    
+
+                    clientConnection.DataReceived += (_, data) => { DataReceived?.Invoke(this, (clientConnection.Id,data)); };
+                    clientConnection.ConnectionClosed += (_, id) => { lock (_connectionsLock) { _connections.RemoveAll(c => c.Id == id); } };
+                    clientConnection.OnConnected += (_, id) => { OnConnected?.Invoke(this, id); };
+                    _ = Task.Run(() => clientConnection.StartReadingAsync(ct));
                 }
             }
             catch (OperationCanceledException)
@@ -59,30 +91,6 @@ namespace GameServer.Server.Network
                 throw new Exception(ex.Message);
             }
         }
-        private async Task HadleClientAsync(TcpClient client,CancellationToken ct)
-        {
-            try
-            {
-                using (client)
-                {
-                    var stream = client.GetStream();
-                    var buffer = new byte[4096];
 
-                    while(!ct.IsCancellationRequested && client.Connected)
-                    {
-                        int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length,ct);
-                        if (bytesRead == 0) break;
-                        var reveivedData = new byte[bytesRead];
-                        Array.Copy(buffer, reveivedData, bytesRead);
-
-                    }
-                        
-                }
-            }
-            catch
-            {
-
-            }
-        }
     }
 }

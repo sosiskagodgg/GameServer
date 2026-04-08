@@ -8,5 +8,6 @@ namespace GameServer.Server.State
 {
     public interface IServerState
     {
+        public bool IsRunning { get; set; }
     }
 }

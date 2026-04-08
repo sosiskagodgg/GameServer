@@ -10,13 +10,13 @@ namespace GameServer.Core.Interfaces
 {
     public interface IGameServerMonitor
     {
-        IReadOnlyList<Player> GetPlayersInRoom(int roomId);
+        IReadOnlyList<Player>? GetPlayersInRoom(int roomId);
         Player? GetPlayer(int playerId);
-        IReadOnlyList<Room> GetRooms();
+        IReadOnlyList<Room>? GetRooms();
         Room? GetRoom(int roomId);
         Task DisconnectPlayerAsync(int playerId);
 
-        IObservable<DataReceivedEvent> OnDataReceived { get; }
+        IObservable<DataRecivedEvent> OnDataReceived { get; }
         IObservable<PlayerConnectedEvent> OnPlayerConnected { get; }
         IObservable<PlayerDisconnectedEvent> OnPlayerDisconnected { get; }
     }
