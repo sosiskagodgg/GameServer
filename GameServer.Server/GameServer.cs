@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using GameServer.Core.Events;
 using GameServer.Core.Interfaces;
 using GameServer.Core.Models;
@@ -27,24 +29,66 @@ namespace GameServer.Server
             _state = state;
             _roomManager = roomManager;
             _playerManager = playerManager;
+
+            _tcpServer.OnConnected += (sender, connectionId) => OnClientConnected(connectionId);
+            _tcpServer.OnDisconnected += (sender, connectionId) => OnClientDisconnected(connectionId);
+            _tcpServer.DataReceived += (sender,data)=> 
+            {
+                int connectionId = data.ClientId;
+                byte[]? receivedData = data.Data;
+                DataReceived(connectionId, receivedData);
+            };
         }
 
         public bool IsRunning => _state.IsRunning;
 
-        public IObservable<DataRecivedEvent> OnDataReceived => throw new NotImplementedException();
+        private readonly Subject<DataRecivedEvent> _dataReceived = new();
+        private readonly Subject<PlayerConnectedEvent> _playerConnected = new();
+        private readonly Subject<PlayerDisconnectedEvent> _playerDisconnected = new();
 
-        public IObservable<PlayerConnectedEvent> OnPlayerConnected => throw new NotImplementedException();
+        public IObservable<DataRecivedEvent> OnDataReceived => _dataReceived.AsObservable();
+        public IObservable<PlayerConnectedEvent> OnPlayerConnected => _playerConnected.AsObservable();
+        public IObservable<PlayerDisconnectedEvent> OnPlayerDisconnected => _playerDisconnected.AsObservable();
 
-        public IObservable<PlayerDisconnectedEvent> OnPlayerDisconnected => throw new NotImplementedException();
-
-        public Task BroadcastToAllAsync(byte[] data, CancellationToken ct = default)
+        private Task OnClientConnected(int connectionId)
         {
-            throw new NotImplementedException();
+            var player = _playerManager.AddPlayer(connectionId);
+
+            _playerConnected.OnNext(new PlayerConnectedEvent(player));
+
+            return Task.CompletedTask;
+
+        }
+        private Task OnClientDisconnected(int connectionId)
+        {
+            var player = _playerManager.GetPlayerByConnectionId(connectionId);
+            if (player == null) return Task.CompletedTask;
+            
+            _roomManager.LeaveRoom(player);
+
+            _playerManager.RemovePlayer(player.Id);
+
+            _playerDisconnected.OnNext(new PlayerDisconnectedEvent(player.Id));
+            return Task.CompletedTask;
+        }
+        private Task DataReceived(int connectionId, byte[] data)
+        {
+            var player = _playerManager.GetPlayerByConnectionId(connectionId);
+            if (player == null) throw new InvalidOperationException("Игрока с таким айди не существует");
+
+            _dataReceived.OnNext(new DataRecivedEvent(player.Id,data));
+            return Task.CompletedTask;
         }
 
-        public Task DisconnectPlayerAsync(int playerId)
+        public async Task BroadcastToAllAsync(byte[] data, CancellationToken ct = default)
         {
-            throw new NotImplementedException();
+            await _tcpServer.BroadcastToAllAsync(data);
+        }
+
+        public Task DisconnectPlayerAsync(Player player)
+        {
+            _roomManager.LeaveRoom(player);
+            return Task.CompletedTask;
         }
 
         public Player? GetPlayer(int playerId)
@@ -67,26 +111,32 @@ namespace GameServer.Server
             return _roomManager.GetAllRooms();
         }
 
-        public Task SendToPlayerAsync(int playerId, byte[] data, CancellationToken ct = default)
+        public async Task SendToPlayerAsync(int playerId, byte[] data, CancellationToken ct = default)
         {
-            throw new NotImplementedException();
+            int? connectionId = _playerManager.GetPlayer(playerId)?.ConnectionId;
+            if (!connectionId.HasValue) 
+                throw new InvalidOperationException("Игрока с таким айди не существует");
+
+            await _tcpServer.SendToClientAsync((int)connectionId, data);
         }
 
-        public Task SendToRoomAsync(int roomId, byte[] data, CancellationToken ct = default)
+        public async Task SendToRoomAsync(int roomId, byte[] data, CancellationToken ct = default)
         {
-            throw new NotImplementedException();
+            List<int> playersId = _roomManager.GetPlayersInRoom(roomId)?.Select(p => p.Id).ToList()?? [];
+            
+            var tasks = playersId.Select(p=>SendToPlayerAsync(p,data,ct));
+
+            await Task.WhenAll(tasks);
         }
 
-        public Task StartAsync(int port, CancellationToken ct = default)
+        public async Task StartAsync(int port, CancellationToken ct = default)
         {
-            _lifecycle.StartAsync(port, ct);
-            return Task.CompletedTask;
+            await _lifecycle.StartAsync(port, ct);
         }
 
-        public Task StopAsync(CancellationToken ct = default)
+        public async Task StopAsync(CancellationToken ct = default)
         {
-            _lifecycle.StopAsync(ct);
-            return Task.CompletedTask;
+            await _lifecycle.StopAsync(ct);
         }
     }
 }

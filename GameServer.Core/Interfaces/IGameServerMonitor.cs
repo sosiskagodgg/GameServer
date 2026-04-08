@@ -14,7 +14,7 @@ namespace GameServer.Core.Interfaces
         Player? GetPlayer(int playerId);
         IReadOnlyList<Room>? GetRooms();
         Room? GetRoom(int roomId);
-        Task DisconnectPlayerAsync(int playerId);
+        Task DisconnectPlayerAsync(Player player);
 
         IObservable<DataRecivedEvent> OnDataReceived { get; }
         IObservable<PlayerConnectedEvent> OnPlayerConnected { get; }

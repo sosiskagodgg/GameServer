@@ -9,7 +9,7 @@ namespace GameServer.Server.PlayerManagement
         /// </summary>
         /// <param name="player">Игрок</param>
         /// <returns>True - успешно добавлен, False - игрок с таким Id уже существует</returns>
-        bool AddPlayer(Player player);
+        Player AddPlayer(int connectionId);
 
         /// <summary>
         /// Удалить игрока
@@ -22,6 +22,11 @@ namespace GameServer.Server.PlayerManagement
         /// Получить игрока по ID
         /// </summary>
         Player? GetPlayer(int playerId);
+
+        /// <summary>
+        /// Получить игрока по ID подключения
+        /// </summary>
+        Player? GetPlayerByConnectionId(int connectionId);
 
         /// <summary>
         /// Получить всех игроков

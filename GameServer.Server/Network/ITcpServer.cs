@@ -12,9 +12,11 @@ namespace GameServer.Server.Network
         Task StartAsync(IPEndPoint endPoint,CancellationToken ct = default);
         Task StopAsync(CancellationToken ct = default);
         Task SendToClientAsync(int clientId, byte[] data);
+        Task BroadcastToAllAsync(byte[] data);
 
         event EventHandler<(int ClientId, byte[]? Data)>? DataReceived;
         event EventHandler<int>? OnConnected;
+        event EventHandler<int>? OnDisconnected;
         bool isRunning {  get; }
     }
 }

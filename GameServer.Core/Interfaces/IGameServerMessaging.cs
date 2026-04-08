@@ -9,8 +9,8 @@ namespace GameServer.Core.Interfaces
 {
     public interface IGameServerMessaging
     {
-        Task SendToPlayerAsync(int playerId, SendingData data, CancellationToken ct = default);
-        Task SendToRoomAsync(int roomId, SendingData data, CancellationToken ct = default);
-        Task BroadcastToAllAsync(SendingData data, CancellationToken ct = default);
+        Task SendToPlayerAsync(int playerId, byte[] data, CancellationToken ct = default);
+        Task SendToRoomAsync(int roomId, byte[] data, CancellationToken ct = default);
+        Task BroadcastToAllAsync(byte[] data, CancellationToken ct = default);
     }
 }

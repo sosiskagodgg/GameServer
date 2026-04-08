@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -11,7 +12,13 @@ namespace GameServer.Server.Network
     public class TcpServer : ITcpServer
     {
 
-
+        private ILogger<TcpServer> _logger;
+        private ILogger<ClientConnection> _clientLogger;
+        public TcpServer(ILogger<TcpServer> logger,ILogger<ClientConnection> clientLogger)
+        {
+            _logger = logger;
+            _clientLogger = clientLogger;
+        }
 
         private TcpListener? _listener;
         private bool _isRunning;
@@ -27,10 +34,15 @@ namespace GameServer.Server.Network
 
         public event EventHandler<(int ClientId, byte[]? Data)>? DataReceived;
         public event EventHandler<int>? OnConnected;
+        public event EventHandler<int>? OnDisconnected;
         public Task StartAsync(IPEndPoint endPoint, CancellationToken ct = default)
         {
             if (_isRunning)
-                throw new InvalidOperationException("Сервер уже запущен");
+            {
+                _logger.LogError("Сервер уже запущен");
+                return Task.CompletedTask;
+            }
+            
 
             _listener = new TcpListener(endPoint);
 
@@ -68,7 +80,7 @@ namespace GameServer.Server.Network
                 {
                     var client = await _listener.AcceptTcpClientAsync(ct);
 
-                    ClientConnection clientConnection = new ClientConnection(_nextId, client);
+                    ClientConnection clientConnection = new ClientConnection(_nextId, client, _clientLogger);
                     lock (_connectionsLock)
                     {
                         _connections.Add(clientConnection);
@@ -77,8 +89,9 @@ namespace GameServer.Server.Network
                     
 
                     clientConnection.DataReceived += (_, data) => { DataReceived?.Invoke(this, (clientConnection.Id,data)); };
-                    clientConnection.ConnectionClosed += (_, id) => { lock (_connectionsLock) { _connections.RemoveAll(c => c.Id == id); } };
+                    clientConnection.ConnectionClosed += (_, id) => { OnDisconnected?.Invoke(this, clientConnection.Id); lock (_connectionsLock) { _connections.RemoveAll(c => c.Id == id); } };
                     clientConnection.OnConnected += (_, id) => { OnConnected?.Invoke(this, id); };
+
                     _ = Task.Run(() => clientConnection.StartReadingAsync(ct));
                 }
             }
@@ -92,5 +105,15 @@ namespace GameServer.Server.Network
             }
         }
 
+        public async Task BroadcastToAllAsync(byte[] data)
+        {
+            List<ClientConnection> connections;
+            lock (_connectionsLock)
+            {
+                connections = _connections.ToList();
+            }
+            var tasks = connections.Select(p=>p.SendAsync(data));
+            await Task.WhenAll(tasks);
+        }
     }
 }

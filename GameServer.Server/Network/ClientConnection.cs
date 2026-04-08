@@ -1,9 +1,11 @@
 ﻿using System.Net.Sockets;
-
+using Microsoft.Extensions.Logging;
 namespace GameServer.Server.Network;
 
 public class ClientConnection : IDisposable
 {
+    private ILogger<ClientConnection> _logger;
+
     public int Id { get; }
     public bool IsConnected => _client.Connected;
 
@@ -15,14 +17,16 @@ public class ClientConnection : IDisposable
     private bool _disposed;
     private bool _isClosed;
 
-    public ClientConnection(int id, TcpClient tcpClient)
+    public ClientConnection(int id, TcpClient tcpClient, ILogger<ClientConnection> logger)
     {
         Id = id;
         _client = tcpClient;
+        _logger = logger;
     }
 
     public async Task StartReadingAsync(CancellationToken ct)
     {
+        _logger.LogInformation("Начало работы с клиентом {ClientId}", Id);
         var stream = _client.GetStream();
         var buffer = new byte[4096];
         OnConnected?.Invoke(this, Id);
@@ -32,7 +36,7 @@ public class ClientConnection : IDisposable
             {
                 int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, ct);
                 if (bytesRead == 0) break;
-
+                _logger.LogTrace("Получено {BytesRead} байт от клиента {ClientId}", bytesRead, Id);
                 var data = new byte[bytesRead];
                 Array.Copy(buffer, data, bytesRead);
                 DataReceived?.Invoke(this, data);

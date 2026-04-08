@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace GameServer.Server.Lifecycle
 {
-    public class ServerLifecycle
+    public class ServerLifecycle : IServerLifecycle
     {
         private readonly ITcpServer _tcpServer;
         private readonly IServerState _state;
