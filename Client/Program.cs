@@ -3,47 +3,85 @@ using System.Text;
 
 namespace GameClient;
 
-public class Program
+class Program
 {
-    private static TcpClient? _client;
-    private static NetworkStream? _stream;
+    static TcpClient? _client;
+    static NetworkStream? _stream;
 
-    public static async Task Main(string[] args)
+    static async Task Main(string[] args)
     {
-        _client = new TcpClient();
-        await _client.ConnectAsync("127.0.0.1", 8080);
-        _stream = _client.GetStream();
+        Console.OutputEncoding = Encoding.UTF8;
+        Console.WriteLine("=== Камень-Ножницы-Бумага ===");
+        Console.Write("Введите IP сервера (Enter - 127.0.0.1): ");
+        string? ip = Console.ReadLine();
+        if (string.IsNullOrWhiteSpace(ip)) ip = "127.0.0.1";
 
-        Console.WriteLine("Подключен к серверу");
+        Console.Write("Введите порт (Enter - 8080): ");
+        string? portInput = Console.ReadLine();
+        int port = string.IsNullOrWhiteSpace(portInput) ? 8080 : int.Parse(portInput);
 
-        // Запускаем приём сообщений
-        _ = Task.Run(ReceiveMessages);
-
-        // Отправляем сообщения
-        while (true)
+        try
         {
-            string? message = Console.ReadLine();
-            if (message == "/quit") break;
+            _client = new TcpClient();
+            await _client.ConnectAsync(ip, port);
+            _stream = _client.GetStream();
 
-            byte[] data = Encoding.UTF8.GetBytes(message);
-            await _stream.WriteAsync(data);
+            Console.WriteLine($"✅ Подключен к {ip}:{port}");
+            Console.WriteLine("📝 Команды:");
+            Console.WriteLine("   PLAY  - начать поиск игры");
+            Console.WriteLine("   CANCEL - выйти из очереди");
+            Console.WriteLine("   1 - Камень");
+            Console.WriteLine("   2 - Ножницы");
+            Console.WriteLine("   3 - Бумага");
+            Console.WriteLine("=================================");
+
+            // Запускаем приём сообщений
+            _ = Task.Run(ReceiveMessages);
+
+            // Отправка команд
+            while (true)
+            {
+                string? input = Console.ReadLine();
+                if (string.IsNullOrWhiteSpace(input)) continue;
+
+                byte[] data = Encoding.UTF8.GetBytes(input);
+                await _stream.WriteAsync(data);
+            }
         }
-
-        _stream.Close();
-        _client.Close();
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Ошибка: {ex.Message}");
+        }
+        finally
+        {
+            _stream?.Close();
+            _client?.Close();
+        }
     }
 
-    private static async Task ReceiveMessages()
+    static async Task ReceiveMessages()
     {
         var buffer = new byte[4096];
 
-        while (true)
+        try
         {
-            int bytesRead = await _stream!.ReadAsync(buffer);
-            if (bytesRead == 0) break;
+            while (true)
+            {
+                int bytesRead = await _stream!.ReadAsync(buffer);
+                if (bytesRead == 0) break;
 
-            string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-            Console.WriteLine($"\nПолучено: {message}\n> ");
+                string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+
+                // Раскодируем Unicode-эскейп последовательности
+                message = System.Text.RegularExpressions.Regex.Unescape(message);
+
+                Console.WriteLine($"\n📨 {message}");
+                Console.Write("> ");
+            }
+        }
+        catch
+        {
+            Console.WriteLine("\n🔌 Соединение разорвано");
         }
     }
 }

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace GameServer.Logic.Enums
 {
-    public enum AnswerType
+    public enum RSP
     {
         rock = 1,
         scissors = 2,

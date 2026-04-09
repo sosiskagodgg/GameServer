@@ -13,7 +13,7 @@ namespace GameServer.Logic.Game
         /// </summary>
         /// <param name="playerIds">ID двух игроков</param>
         /// <returns>true - игра создана, false - ошибка</returns>
-        bool CreateGame(int[] playerIds);
+        Task<bool> CreateGame(int[] playerIds);
 
         /// <summary>
         /// Завершить игру в комнате
@@ -71,6 +71,6 @@ namespace GameServer.Logic.Game
         /// <summary>
         /// Событие при завершении игры
         /// </summary>
-        event EventHandler<int>? GameEnded;
+        public event EventHandler<(int RoomId, List<int> PlayerIds)>? GameEnded;
     }
 }

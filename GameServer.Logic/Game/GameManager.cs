@@ -3,6 +3,7 @@ using GameServer.Core.Models;
 using GameServer.Logic.Models;
 using GameServer.Server.PlayerManagement;
 using GameServer.Server.RoomManagement;
+using GameServer.Server.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
@@ -33,9 +34,9 @@ namespace GameServer.Logic.Game
         public int ActiveGamesCount => _games.Count;
 
         public event EventHandler<int>? GameCreated;
-        public event EventHandler<int>? GameEnded;
+        public event EventHandler<(int RoomId, List<int> PlayerIds)>? GameEnded;
 
-        public bool CreateGame(int[] playerId)
+        public async Task<bool> CreateGame(int[] playerId)
         {
             if (playerId.Length != 2) 
             {
@@ -73,10 +74,10 @@ namespace GameServer.Logic.Game
                 return false;
             }
 
-            GameSession gameSession = new(room,_serviceProvider.GetRequiredService<IGameServer>());
+            GameSession gameSession = new(room,_serviceProvider.GetRequiredService<IGameServer>(),_serviceProvider.GetRequiredService<IMessageConverter>(),_serviceProvider.GetRequiredService<ILogger<GameSession>>());
 
             gameSession.GameFinished += (sender, finishedRoomId) => EndGame(finishedRoomId);
-
+            await gameSession.Start();
             _games.Add(roomId, gameSession);
             _playerToRoom.Add(firstPlayer.Id, roomId);
             _playerToRoom.Add(secondPlayer.Id, roomId);
@@ -92,15 +93,22 @@ namespace GameServer.Logic.Game
         {
             if (!_games.ContainsKey(roomId))
             {
-                _logger.LogError("Комнаты с таким айди не существует {Id}",roomId);
+                _logger.LogError("Комнаты с таким айди не существует {Id}", roomId);
                 return;
             }
-            GameEnded?.Invoke(this, roomId);
+
+            
+            var playersInRoom = _playerToRoom
+                .Where(x => x.Value == roomId)
+                .Select(x => x.Key)
+                .ToList();
+
+            
             _games.Remove(roomId);
+            foreach (var p in playersInRoom) _playerToRoom.Remove(p);
 
-            var playersToRemove = _playerToRoom.Where(x=>x.Value == roomId).Select(k=>k.Key).ToList();
-            foreach(var p in playersToRemove)_playerToRoom.Remove(p);
-
+            
+            GameEnded?.Invoke(this, (roomId, playersInRoom));
         }
 
         public IReadOnlyList<IGameSession> GetAllActiveGames()

@@ -1,4 +1,5 @@
 ﻿using GameServer.Core.Models;
+using GameServer.Logic.Models;
 
 namespace GameServer.Logic.Game
 {
@@ -27,7 +28,7 @@ namespace GameServer.Logic.Game
         /// </summary>
         /// <param name="playerId">ID игрока</param>
         /// <param name="data">Данные хода</param>
-        void HandleInput(int playerId, byte[] data);
+        Task HandleInput(int playerId, byte[] data);
 
         /// <summary>
         /// Получить ID всех игроков в игре
@@ -37,12 +38,12 @@ namespace GameServer.Logic.Game
         /// <summary>
         /// Начать игру
         /// </summary>
-        void Start();
+        Task Start();
 
         /// <summary>
         /// Завершить игру досрочно
         /// </summary>
-        void ForceEnd();
+        Task ForceEnd();
 
         /// <summary>
         /// Событие при завершении игры
@@ -52,12 +53,12 @@ namespace GameServer.Logic.Game
         /// <summary>
         /// Событие когда игрок сделал ход
         /// </summary>
-        event EventHandler<(int PlayerId, string Move)>? PlayerMadeMove;
+        event EventHandler<Motion>? PlayerMadeMove;
 
         /// <summary>
         /// Событие когда определен победитель
         /// </summary>
-        event EventHandler<(int? WinnerId, string Result)>? GameResultReady;
+        event EventHandler<Motion?>? GameResultReady;
     }
 
     /// <summary>
